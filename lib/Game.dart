@@ -16,7 +16,12 @@ class GameState extends State<Game>{
   static const int ACTIVE = 1;
   static const int WIN = 2;
 
+
   GameStateHandler curState;
+
+
+  double opacity = 1.0;
+  int duration = 300; //淡入淡出间隔(毫秒)
 
   @override
   void initState() {
@@ -31,15 +36,26 @@ class GameState extends State<Game>{
       appBar: new AppBar(
         title: new Text('klocki'),
       ),
-      body: body,
+      body: new AnimatedOpacity(
+        opacity: this.opacity,
+        duration: new Duration(milliseconds: duration),
+        child: body,
+      ),
     );
   }
 
   void changeState(GameStateHandler newState){
-    curState.onExit();
+    //淡入淡出效果
     setState(() {
-      curState = newState;
-      newState.onEnter();
+      this.opacity = 0.0;
+      curState.onExit();
+    });
+    new Timer(new Duration(milliseconds: duration), (){
+      setState(() {
+        curState = newState;
+        newState.onEnter();
+        this.opacity = 1.0;
+      });
     });
   }
 }
