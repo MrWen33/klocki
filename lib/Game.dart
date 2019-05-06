@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import './CheckerLoader.dart';
+import './LevelLoader.dart';
 import './Checkerboard.dart';
 import 'dart:async';
+import 'Level.dart';
 
 class Game extends StatefulWidget{
   @override
@@ -83,7 +84,9 @@ class MenuState extends GameStateHandler{
   Widget handle(){
     return new Center(
       child: new RaisedButton(onPressed: (){
-        state.changeState(new ActiveState(state));
+        LevelLoader.loadFromAssets('level1.json').then((level){
+          state.changeState(new ActiveState(state, level));
+        });
       }, child: new Text('Game Start'),),
     );
   }
@@ -97,8 +100,10 @@ class MenuState extends GameStateHandler{
 
 //TODO: class ACTIVE
 class ActiveState extends GameStateHandler{
-  ActiveState(GameState state):super(state);
-  
+  ActiveState(GameState state, this.level):super(state);
+
+  Level level;
+
   @override
   onEnter() {
     // TODO: implement onEnter
@@ -108,7 +113,7 @@ class ActiveState extends GameStateHandler{
   @override
   Widget handle() {
     return new Center(
-      child: Checkerboard(initState: CheckerLoader.loadDefault(), onWin: (){
+      child: Checkerboard(initState: this.level.info, onWin: (){
         state.changeState(new WinState(state));
       },),
     );
