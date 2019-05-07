@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'dart:core';
 import './Checker.dart';
 import './CheckerInfo.dart';
+import 'Constants.dart';
+import 'Replay.dart';
 
 class Checkerboard extends StatefulWidget{
   Checkerboard({
@@ -29,13 +31,6 @@ class Checkerboard extends StatefulWidget{
     var con = InputCheckerboardController(model);
     return con.getView();
   }
-}
-
-class DIR{
-  static const UP=0;
-  static const DOWN=1;
-  static const LEFT=2;
-  static const RIGHT=3;
 }
 
 abstract class ICheckerboardModel{
@@ -376,5 +371,42 @@ class InputCheckerboardController implements ICheckerboardController{
   @override
   bool attemptMoveChess(int ID, int dir) {
     return model.attemptMoveChess(ID, dir);
+  }
+}
+
+/*
+ * Replay控制器, 用于实现replay系统控制棋子
+ */
+class ReplayCheckerboardController implements ICheckerboardController, CommandReceiver{
+  CheckerboardView view;
+  ICheckerboardModel model;
+
+  InputCheckerboardController(ICheckerboardModel model){
+    this.model = model;
+    view = new CheckerboardView(this, model);
+  }
+
+  @override
+  CheckerboardView getView() {
+    return view;
+  }
+
+  @override
+  bool attemptMoveChess(int ID, int dir) {
+    //不对屏幕棋盘点击做出响应
+    return false;
+  }
+
+  /*
+  用于replay系统操作棋子
+   */
+  @override
+  bool execute(Command cmd) {
+    model.attemptMoveChess(cmd.ID, cmd.dir);
+  }
+
+  @override
+  bool undo(Command cmd) {
+    model.attemptMoveChess(cmd.ID, DIR.reverse(cmd.dir));
   }
 }
