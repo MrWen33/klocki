@@ -13,6 +13,7 @@ class Checkerboard extends StatefulWidget{
     this.exitX: 1,
     this.exitY: 0,
     this.onWin,
+    @required this.levelID,
     @required this.initState
   });
 
@@ -21,6 +22,7 @@ class Checkerboard extends StatefulWidget{
   final int column;
   final int exitX;
   final int exitY;
+  final int levelID;
   final List<CheckerInfo> initState;
 
   @override
@@ -29,6 +31,7 @@ class Checkerboard extends StatefulWidget{
     CheckerboardModel model = new CheckerboardModel(initState, row, column, exitX, exitY);
     model.registerWinCallback(this.onWin);
     var con = InputCheckerboardController(model);
+    var rep = ReplayRecorder(model, levelID);
     return con.getView();
   }
 }
@@ -54,8 +57,8 @@ class CheckerboardModel implements ICheckerboardModel{
   int exitX;
   int exitY;
 
-  var blockObservers = <BlockObserver>[];
-  var winCallbacks = <Function>[];
+  var _blockObservers = <BlockObserver>[];
+  var _winCallbacks = <Function>[];
 
   @override
   List<CheckerInfo> getBoardInfo(){
@@ -63,26 +66,26 @@ class CheckerboardModel implements ICheckerboardModel{
   }
 
   registerBlockObserver(BlockObserver observer){
-    blockObservers.add(observer);
+    _blockObservers.add(observer);
   }
   removeBlockObserver(BlockObserver observer){
-    blockObservers.remove(observer);
+    _blockObservers.remove(observer);
   }
   registerWinCallback(Function callback){
-    winCallbacks.add(callback);
+    _winCallbacks.add(callback);
   }
   removeWinCallback(Function callback){
-    winCallbacks.remove(callback);
+    _winCallbacks.remove(callback);
   }
 
-  notifyAllBlockObservers(){
-    for(var o in blockObservers){
-      o.notify();
+  notifyAllBlockObservers(int ID, int dir){
+    for(var o in _blockObservers){
+      o.notify(ID, dir);
     }
   }
 
   notifyAllWinObservers(){
-    for(var f in winCallbacks){
+    for(var f in _winCallbacks){
       f();
     }
   }
@@ -217,7 +220,6 @@ class CheckerboardModel implements ICheckerboardModel{
   bool attemptMoveCheckerDir(CheckerInfo checker, int dir){
     if(canMove(checker, dir)){
       moveCheckerDir(checker, dir);
-      notifyAllBlockObservers();
       return true;
     }else{
       return false;
@@ -226,13 +228,17 @@ class CheckerboardModel implements ICheckerboardModel{
 
   @override
   bool attemptMoveChess(int ID, int dir) {
-    return attemptMoveCheckerDir(checkersStates[ID], dir);
+    var success = attemptMoveCheckerDir(checkersStates[ID], dir);
+    if(success){
+      notifyAllBlockObservers(ID, dir);
+    }
+    return success;
   }
 
 }
 
 abstract class BlockObserver{
-  notify();
+  notify(int ID, int dir);
 }
 
 abstract class WinObserver{
@@ -257,7 +263,7 @@ class CheckerboardView extends State<Checkerboard> with BlockObserver{
   }
 
   @override
-  notify() {
+  notify(int _1, int _2) {
     setState((){});
   }
 
@@ -392,7 +398,7 @@ class ReplayCheckerboardController implements ICheckerboardController, CommandRe
   }
 
   @override
-  bool attemptMoveChess(int ID, int dir) {
+  bool attemptMoveChess(int _1, int _2) {
     //不对屏幕棋盘点击做出响应
     return false;
   }

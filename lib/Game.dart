@@ -3,6 +3,7 @@ import './LevelLoader.dart';
 import './Checkerboard.dart';
 import 'dart:async';
 import 'Level.dart';
+import 'Replay.dart';
 
 class Game extends StatefulWidget{
   @override
@@ -84,25 +85,131 @@ class MenuState extends GameStateHandler{
   Widget handle(){
     return new Center(
       child: new RaisedButton(onPressed: (){
-        LevelLoader.loadFromAssets('level1.json').then((level){
-          state.changeState(new ActiveState(state, level));
-        });
+          state.changeState(LevelChooseState(state));
       }, child: new Text('Game Start'),),
     );
   }
 
   @override
   onExit() {
-    // TODO: implement onExit
     return null;
   }
 }
 
-//TODO: class ACTIVE
+class LevelChooseState extends GameStateHandler{
+  LevelChooseState(GameState state):super(state);
+
+  List<Level> levels = <Level>[];
+
+  @override
+  Widget handle() {
+    levels.sort((level1, level2)=>level1.id.compareTo(level2.id));
+    var columnNum = 4;
+    var row = <Widget>[];
+    var rows = <TableRow>[];
+    var i = 0 ;
+    for(var level in levels){
+      if(i%columnNum==0&&i!=0){
+        rows.add(TableRow(children: row));
+        row = <Widget>[];
+      }
+      row.add(btnFromLevel(level));
+      i++;
+    }
+    while(row.length<columnNum){
+      row.add(Container());
+    }
+    rows.add(TableRow(children: row));
+    return Table(
+      border: new TableBorder.all(width: 5.0, color: Colors.transparent),
+      children: rows,
+    );
+  }
+
+  Widget btnFromLevel(Level level){
+    return RaisedButton(
+      onPressed: ()=>state.changeState(new ActiveState(state, level)),
+      child: new Text(level.id.toString()),
+    );
+  }
+
+  @override
+  onEnter() {
+    LevelLoader.loadFromAssets('level1.json').then(
+        (levelList){
+          state.setState(
+              ()=>levels = levelList
+          );
+        }
+    );
+    return null;
+  }
+
+  @override
+  onExit() {
+    return null;
+  }
+
+}
+
 class ActiveState extends GameStateHandler{
   ActiveState(GameState state, this.level):super(state);
 
   Level level;
+
+  @override
+  onEnter() {
+    return null;
+  }
+
+  @override
+  Widget handle() {
+    var checkerboard = Checkerboard(initState: this.level.info, levelID: this.level.id, onWin: ()=>state.changeState(new WinState(state)));
+    return new Center(
+      child: checkerboard,
+    );
+  }
+  @override
+  onExit() {
+    return null;
+  }
+}
+
+class WinState extends GameStateHandler{
+  WinState(GameState state):super(state);
+  
+  @override
+  onEnter() {}
+  
+  @override
+  onExit() {}
+  
+  @override
+  Widget handle() {
+    return new Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: <Widget>[
+          Text("You Win"),
+          RaisedButton(
+            onPressed: ()=>state.changeState(MenuState(state)),
+            child: Text("Home"),
+          )
+        ],
+      ),
+    );
+  }
+}
+
+//TODO: ReplayState implement
+class ReplayState extends GameStateHandler{
+  ReplayState(GameState state) : super(state);
+
+  @override
+  Widget handle() {
+    // TODO: implement handle
+    return null;
+  }
 
   @override
   onEnter() {
@@ -111,41 +218,9 @@ class ActiveState extends GameStateHandler{
   }
 
   @override
-  Widget handle() {
-    return new Center(
-      child: Checkerboard(initState: this.level.info, onWin: (){
-        state.changeState(new WinState(state));
-      },),
-    );
-  }
-  @override
   onExit() {
     // TODO: implement onExit
     return null;
   }
-}
 
-//TODO: class WIN
-class WinState extends GameStateHandler{
-  WinState(GameState state):super(state);
-  
-  @override
-  onEnter() {
-    new Timer(new Duration(seconds: 3), (){
-      state.changeState(MenuState(state));
-    });
-  }
-  
-  @override
-  onExit() {
-
-  }
-  
-  @override
-  Widget handle() {
-    // TODO: implement handle
-    return new Center(
-      child: Text("You Win"),
-    );
-  }
 }

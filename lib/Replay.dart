@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'Checkerboard.dart';
 
 class Command{
   Command(this.ID, this.dir);
@@ -59,7 +60,7 @@ class Replay{
 }
 
 class ReplayBuilder{
-  List<Command> commands;
+  List<Command> commands = <Command>[];
   int ID = -1;
   String name = 'Player';
   bool isIDSet = false;
@@ -79,7 +80,7 @@ class ReplayBuilder{
     return this;
   }
 
-  Replay build(String name){
+  Replay build(){
     if(!isIDSet){
       throw new Exception("ERROR::REPLAY ID NOT SET!");
     }
@@ -88,17 +89,47 @@ class ReplayBuilder{
 }
 
 class ReplayManager{
+  static const SAVE_NAME = 'replays';
   static save(Replay rep) async{
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    var replist = prefs.getStringList('replays');
-    if(replist==null){
-      replist = <String>[];
+    var repList = prefs.getStringList(SAVE_NAME);
+    if(repList==null){
+      repList = <String>[];
     }
-    replist.add(json.encode(rep));
-    prefs.setStringList('replays', replist);
+    repList.add(json.encode(rep));
+    prefs.setStringList(SAVE_NAME, repList);
   }
 
   static loadAll(){
 
+  }
+}
+
+class ReplayRecorder implements BlockObserver{
+  ReplayBuilder _replayBuilder = ReplayBuilder();
+  ICheckerboardModel _model;
+
+  ReplayRecorder(ICheckerboardModel model, int levelID){
+    _replayBuilder.setID(levelID);
+    _model = model;
+    model.registerBlockObserver(this);
+  }
+
+  /*
+   *  记录一步
+   */
+  record(int ID, int dir){
+    _replayBuilder.append(Command(ID, dir));
+  }
+
+  @override
+  notify(int ID, int dir) {
+    record(ID, dir);
+  }
+
+  Replay save(String name){
+    _model.removeBlockObserver(this);
+    _replayBuilder.setName(name);
+    return _replayBuilder.build();
   }
 }
