@@ -10,6 +10,7 @@ class Command{
     'ID': ID,
     'dir': dir
   };
+  Command.fromJson(jsonData):this.ID=jsonData['ID'], this.dir=jsonData['dir'];
 }
 
 abstract class CommandReceiver{
@@ -32,6 +33,13 @@ class Replay{
     'name': name,
     'commands': _commands
   };
+
+  Replay.fromJson(jsonData): this.ID=(jsonData['ID']), this.name = jsonData['name']{
+    this._commands = <Command>[];
+    for(var data in jsonData['commands']){
+      this._commands.add(Command.fromJson(data));
+    }
+  }
 
   /*
   向前执行指令, 若到底则返回false
@@ -73,6 +81,7 @@ class ReplayBuilder{
 
   ReplayBuilder setName(String name){
     this.name = name;
+    return this;
   }
 
   ReplayBuilder append(Command cmd){
@@ -89,29 +98,52 @@ class ReplayBuilder{
 }
 
 class ReplayManager{
+  factory ReplayManager() => _getInstance();
+
+  static ReplayManager _instance;
+  static ReplayManager get instance => _getInstance();
+  static ReplayManager _getInstance(){
+    if(_instance==null){
+      _instance = ReplayManager.init();
+    }
+    return _instance;
+  }
+
+  ReplayManager.init();
+
   static const SAVE_NAME = 'replays';
-  static save(Replay rep) async{
+  save(Replay rep) async{
     SharedPreferences prefs = await SharedPreferences.getInstance();
     var repList = prefs.getStringList(SAVE_NAME);
     if(repList==null){
       repList = <String>[];
     }
-    repList.add(json.encode(rep));
+    var jsonStr = json.encode(rep);
+    print("repjsonstr:"+jsonStr);
+    repList.add(jsonStr);
     prefs.setStringList(SAVE_NAME, repList);
   }
 
-  static loadAll(){
-
+  loadAll() async{
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    var repStrList = prefs.getStringList(SAVE_NAME);
+    var repMap = Map<int, List<Replay>>();
+    for(var repStr in repStrList){
+      final jsonMap = json.decode(repStr);
+      var rep = Replay.fromJson(jsonMap);
+      if(!repMap.containsKey(rep.ID)){
+        repMap[rep.ID] = <Replay>[];
+      }
+      repMap[rep.ID].add(rep);
+    }
+    return repMap;
   }
 }
 
 class ReplayRecorder implements BlockObserver{
   ReplayBuilder _replayBuilder = ReplayBuilder();
-  ICheckerboardModel _model;
-
   ReplayRecorder(ICheckerboardModel model, int levelID){
     _replayBuilder.setID(levelID);
-    _model = model;
     model.registerBlockObserver(this);
   }
 
@@ -128,7 +160,6 @@ class ReplayRecorder implements BlockObserver{
   }
 
   Replay save(String name){
-    _model.removeBlockObserver(this);
     _replayBuilder.setName(name);
     return _replayBuilder.build();
   }

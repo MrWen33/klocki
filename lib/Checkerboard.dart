@@ -4,6 +4,8 @@ import './Checker.dart';
 import './CheckerInfo.dart';
 import 'Constants.dart';
 import 'Replay.dart';
+import 'LevelPlayerInfo.dart';
+import 'dart:async';
 
 class Checkerboard extends StatefulWidget{
   Checkerboard({
@@ -13,6 +15,7 @@ class Checkerboard extends StatefulWidget{
     this.exitX: 1,
     this.exitY: 0,
     this.onWin,
+    @required this.controller,
     @required this.levelID,
     @required this.initState
   });
@@ -23,16 +26,22 @@ class Checkerboard extends StatefulWidget{
   final int exitX;
   final int exitY;
   final int levelID;
+  final ICheckerboardController controller;
   final List<CheckerInfo> initState;
 
   @override
   State<StatefulWidget> createState() {
-    // TODO: implement createState
-    CheckerboardModel model = new CheckerboardModel(initState, row, column, exitX, exitY);
-    model.registerWinCallback(this.onWin);
-    var con = InputCheckerboardController(model);
+    List<CheckerInfo> checkerState = <CheckerInfo>[];
+    for(var checker in initState){
+      checkerState.add(checker.clone());
+    }
+    CheckerboardModel model = new CheckerboardModel(checkerState, row, column, exitX, exitY);
+    controller.setModel(model);
     var rep = ReplayRecorder(model, levelID);
-    return con.getView();
+    model.registerWinCallback((playTime){
+      this.onWin(LevelPlayerInfo(rep, playTime));
+    });
+    return controller.getView();
   }
 }
 
@@ -45,6 +54,8 @@ abstract class ICheckerboardModel{
   removeBlockObserver(BlockObserver observer);
   registerWinCallback(Function callback);
   removeWinCallback(Function callback);
+  registerTimeCallback(Function callback);
+  removeTimeCallback(Function callback);
 }
 
 class CheckerboardModel implements ICheckerboardModel{
@@ -56,9 +67,12 @@ class CheckerboardModel implements ICheckerboardModel{
   int column;
   int exitX;
   int exitY;
+  DateTime startTime = DateTime.now();
 
   var _blockObservers = <BlockObserver>[];
   var _winCallbacks = <Function>[];
+  var _timeCallbacks = <Function>[];
+  Timer _timer;
 
   @override
   List<CheckerInfo> getBoardInfo(){
@@ -77,6 +91,12 @@ class CheckerboardModel implements ICheckerboardModel{
   removeWinCallback(Function callback){
     _winCallbacks.remove(callback);
   }
+  registerTimeCallback(Function callback){
+    _timeCallbacks.add(callback);
+  }
+  removeTimeCallback(Function callback){
+    _timeCallbacks.remove(callback);
+  }
 
   notifyAllBlockObservers(int ID, int dir){
     for(var o in _blockObservers){
@@ -85,15 +105,29 @@ class CheckerboardModel implements ICheckerboardModel{
   }
 
   notifyAllWinObservers(){
+
     for(var f in _winCallbacks){
-      f();
+      f(DateTime.now().difference(this.startTime).inSeconds);
     }
+  }
+
+  notifyAllTimeObservers(){
+    for(var f in _timeCallbacks){
+      f(getTime());
+    }
+  }
+
+  Duration getTime(){
+    return DateTime.now().difference(this.startTime);
   }
 
   CheckerboardModel(List<CheckerInfo> initState, int row, int column, int exitX, int exitY){
     initCheckerMap(initState, row, column);
     this.exitX = exitX;
     this.exitY = exitY;
+    _timer = Timer.periodic(Duration(seconds: 1), (_){
+      notifyAllTimeObservers();
+    });
   }
 
   @override
@@ -196,7 +230,7 @@ class CheckerboardModel implements ICheckerboardModel{
       checker.y = y;
       setCheckerMapArea(checker.x, checker.y, checker.width, checker.height, checker);
     if(isWin()){
-      notifyAllWinObservers();
+      win();
     }
   }
 
@@ -235,14 +269,15 @@ class CheckerboardModel implements ICheckerboardModel{
     return success;
   }
 
+  void win(){
+    _timer.cancel();
+    notifyAllWinObservers();
+  }
+
 }
 
 abstract class BlockObserver{
   notify(int ID, int dir);
-}
-
-abstract class WinObserver{
-  onWin();
 }
 
 class CheckerboardView extends State<Checkerboard> with BlockObserver{
@@ -251,6 +286,7 @@ class CheckerboardView extends State<Checkerboard> with BlockObserver{
   ICheckerboardController controller;
 
   Offset dragDownPos;//按下时的位置
+  Duration duration;//过去的时间
 
   CheckerboardView(ICheckerboardController controller, ICheckerboardModel model){
     initialize(controller, model);
@@ -259,12 +295,20 @@ class CheckerboardView extends State<Checkerboard> with BlockObserver{
   initialize(ICheckerboardController controller, ICheckerboardModel model) {
     this.controller = controller;
     this.model = model;
+    this.duration = Duration();
     model.registerBlockObserver(this);
+    model.registerTimeCallback(onTimeChange);
   }
 
   @override
   notify(int _1, int _2) {
     setState((){});
+  }
+
+  onTimeChange(Duration duration){
+    setState(() {
+      this.duration = duration;
+    });
   }
 
   getWidthPx(){
@@ -339,18 +383,22 @@ class CheckerboardView extends State<Checkerboard> with BlockObserver{
       ++ind;
     });
 
-    return Container(
-        decoration: new BoxDecoration(
+    return Column(
+      children: <Widget>[
+        Text(duration.inSeconds.toString()),
+        Container(
+          decoration: new BoxDecoration(
             border: new Border.all(
-                width: 2,
-                color: Colors.brown
+              width: 2,
+              color: Colors.brown
             )
-        ),
-        height: getHeightPx(),
+          ),
+          height: getHeightPx(),
 
-        child: Stack(
-          children: children,
-        )
+          child: Stack(
+        children: children,
+        ),
+      )]
     );
   }
 }
@@ -358,16 +406,12 @@ class CheckerboardView extends State<Checkerboard> with BlockObserver{
 abstract class ICheckerboardController{
   bool attemptMoveChess(int ID, int dir);
   CheckerboardView getView();
+  void setModel(ICheckerboardModel model);
 }
 
 class InputCheckerboardController implements ICheckerboardController{
   CheckerboardView view;
   ICheckerboardModel model;
-
-  InputCheckerboardController(ICheckerboardModel model){
-    this.model = model;
-    view = new CheckerboardView(this, model);
-  }
 
   @override
   CheckerboardView getView() {
@@ -378,6 +422,12 @@ class InputCheckerboardController implements ICheckerboardController{
   bool attemptMoveChess(int ID, int dir) {
     return model.attemptMoveChess(ID, dir);
   }
+
+  @override
+  void setModel(ICheckerboardModel model) {
+    this.model = model;
+    view = new CheckerboardView(this, model);
+  }
 }
 
 /*
@@ -386,11 +436,6 @@ class InputCheckerboardController implements ICheckerboardController{
 class ReplayCheckerboardController implements ICheckerboardController, CommandReceiver{
   CheckerboardView view;
   ICheckerboardModel model;
-
-  InputCheckerboardController(ICheckerboardModel model){
-    this.model = model;
-    view = new CheckerboardView(this, model);
-  }
 
   @override
   CheckerboardView getView() {
@@ -414,5 +459,11 @@ class ReplayCheckerboardController implements ICheckerboardController, CommandRe
   @override
   bool undo(Command cmd) {
     model.attemptMoveChess(cmd.ID, DIR.reverse(cmd.dir));
+  }
+
+  @override
+  void setModel(ICheckerboardModel model) {
+    this.model = model;
+    view = new CheckerboardView(this, model);
   }
 }

@@ -1,3 +1,7 @@
+import 'Replay.dart';
+
 class LevelPlayerInfo{
-  //TODO: levelPlayerInfo data
+  int playTime;
+  ReplayRecorder recorder;
+  LevelPlayerInfo(this.recorder, this.playTime);
 }

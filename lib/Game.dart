@@ -4,6 +4,8 @@ import './Checkerboard.dart';
 import 'dart:async';
 import 'Level.dart';
 import 'Replay.dart';
+import 'LevelPlayerInfo.dart';
+import 'Constants.dart';
 
 class Game extends StatefulWidget{
   @override
@@ -20,6 +22,7 @@ class GameState extends State<Game>{
 
 
   GameStateHandler curState;
+  LevelPlayerInfo info;
 
 
   double opacity = 1.0;
@@ -28,6 +31,7 @@ class GameState extends State<Game>{
   @override
   void initState() {
     super.initState();
+    LevelLoader.instance.loadFromAssets('level1.json').then((_)=>setState((){}));
     curState = MenuState(this);
   }
 
@@ -84,10 +88,18 @@ class MenuState extends GameStateHandler{
   @override
   Widget handle(){
     return new Center(
-      child: new RaisedButton(onPressed: (){
-          state.changeState(LevelChooseState(state));
-      }, child: new Text('Game Start'),),
-    );
+      
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: <Widget>[
+          new RaisedButton(onPressed: (){
+            state.changeState(LevelChooseState(state, false));
+          }, child: new Text('Game Start'),),
+          new RaisedButton(onPressed: (){
+              state.changeState(LevelChooseState(state, true));
+            }, child: Text('Replay'),)
+        ]
+    ));
   }
 
   @override
@@ -97,12 +109,14 @@ class MenuState extends GameStateHandler{
 }
 
 class LevelChooseState extends GameStateHandler{
-  LevelChooseState(GameState state):super(state);
+  LevelChooseState(GameState state, this.isRep):super(state);
 
   List<Level> levels = <Level>[];
+  bool isRep;
 
   @override
   Widget handle() {
+    levels = LevelLoader.instance.levels;
     levels.sort((level1, level2)=>level1.id.compareTo(level2.id));
     var columnNum = 4;
     var row = <Widget>[];
@@ -128,20 +142,19 @@ class LevelChooseState extends GameStateHandler{
 
   Widget btnFromLevel(Level level){
     return RaisedButton(
-      onPressed: ()=>state.changeState(new ActiveState(state, level)),
+      onPressed: (){
+          if(isRep){
+            state.changeState(ReplayChooseState(state, level));
+          }else {
+            state.changeState(new ActiveState(state, level));
+          }
+        },
       child: new Text(level.id.toString()),
     );
   }
 
   @override
   onEnter() {
-    LevelLoader.loadFromAssets('level1.json').then(
-        (levelList){
-          state.setState(
-              ()=>levels = levelList
-          );
-        }
-    );
     return null;
   }
 
@@ -164,13 +177,27 @@ class ActiveState extends GameStateHandler{
 
   @override
   Widget handle() {
-    var checkerboard = Checkerboard(initState: this.level.info, levelID: this.level.id, onWin: ()=>state.changeState(new WinState(state)));
+    var checkerboard = Checkerboard(initState: this.level.info, levelID: this.level.id,
+        controller: InputCheckerboardController(),
+        onWin: (info){
+          state.info = info;
+          state.changeState(
+            new WinState(state));
+        });
     return new Center(
       child: checkerboard,
     );
   }
   @override
   onExit() {
+    var rep = ReplayBuilder()
+        .append(Command(0, DIR.DOWN))
+        .append(Command(0, DIR.DOWN))
+        .append(Command(0, DIR.DOWN))
+        .setName('ss')
+        .setID(level.id)
+        .build();
+    ReplayManager.instance.save(rep);
     return null;
   }
 }
@@ -191,6 +218,7 @@ class WinState extends GameStateHandler{
         mainAxisAlignment: MainAxisAlignment.center,
         children: <Widget>[
           Text("You Win"),
+          Text("Time:"+state.info.playTime.toString()+"s"),
           RaisedButton(
             onPressed: ()=>state.changeState(MenuState(state)),
             child: Text("Home"),
@@ -201,25 +229,80 @@ class WinState extends GameStateHandler{
   }
 }
 
-//TODO: ReplayState implement
-class ReplayState extends GameStateHandler{
-  ReplayState(GameState state) : super(state);
+/* 显示某关的所有rep供选择 */
+class ReplayChooseState extends GameStateHandler{
+  ReplayChooseState(GameState state, this._level) : super(state);
 
+  Level _level;
   @override
   Widget handle() {
-    // TODO: implement handle
-    return null;
+
+    return Center(
+      child: RaisedButton(onPressed: ()=>state.changeState(ReplayState(
+          state,
+          //Test rep object
+          ReplayBuilder()
+              .append(Command(0, DIR.DOWN))
+              .append(Command(0, DIR.DOWN))
+              .append(Command(0, DIR.DOWN))
+              .setName('ss')
+              .setID(_level.id)
+              .build(),
+          _level))),
+    );
   }
 
   @override
   onEnter() {
-    // TODO: implement onEnter
     return null;
   }
 
   @override
   onExit() {
-    // TODO: implement onExit
+    return null;
+  }
+
+}
+
+//TODO: ReplayState implement
+class ReplayState extends GameStateHandler{
+  ReplayState(GameState state, this._replay, this._level) : super(state);
+
+  Replay _replay;
+  Level _level;
+
+  @override
+  Widget handle() {
+    var controller = ReplayCheckerboardController();
+    var checkerboard = Checkerboard(initState: this._level.info, levelID: _replay.ID,
+        controller: controller,
+        onWin: (info){});
+    return new Center(
+      child: Column(children: <Widget>[
+        checkerboard,
+        Row(
+          children: <Widget>[
+            RaisedButton(
+              onPressed: ()=>_replay.back(controller),
+              child: Text("<"),
+            ),
+            RaisedButton(
+              onPressed: ()=>_replay.forward(controller),
+              child: Text(">"),
+            )
+          ],
+        )
+      ],)
+    );
+  }
+
+  @override
+  onEnter() {
+    return null;
+  }
+
+  @override
+  onExit() {
     return null;
   }
 

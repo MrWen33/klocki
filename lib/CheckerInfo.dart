@@ -17,4 +17,7 @@ class CheckerInfo{
   int height;
   //是否是曹操
   bool isTarget;
+  CheckerInfo clone(){
+    return new CheckerInfo(x: this.x, y: this.y, width: this.width, height: this.height, isTarget: this.isTarget);
+  }
 }
