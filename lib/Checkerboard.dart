@@ -49,6 +49,7 @@ abstract class ICheckerboardModel{
   void initialize();
   List<CheckerInfo> getBoardInfo();
   bool attemptMoveChess(int ID, int dir);
+  void onDispose();
 
   registerBlockObserver(BlockObserver observer);
   removeBlockObserver(BlockObserver observer);
@@ -128,6 +129,10 @@ class CheckerboardModel implements ICheckerboardModel{
     _timer = Timer.periodic(Duration(seconds: 1), (_){
       notifyAllTimeObservers();
     });
+  }
+
+  void onDispose(){
+    _timer.cancel();
   }
 
   @override
@@ -288,6 +293,7 @@ class CheckerboardView extends State<Checkerboard> with BlockObserver{
   Offset dragDownPos;//按下时的位置
   Duration duration;//过去的时间
 
+
   CheckerboardView(ICheckerboardController controller, ICheckerboardModel model){
     initialize(controller, model);
   }
@@ -298,6 +304,12 @@ class CheckerboardView extends State<Checkerboard> with BlockObserver{
     this.duration = Duration();
     model.registerBlockObserver(this);
     model.registerTimeCallback(onTimeChange);
+  }
+
+  @override
+  void dispose() {
+    model.onDispose();
+    super.dispose();
   }
 
   @override

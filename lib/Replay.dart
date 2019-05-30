@@ -104,12 +104,16 @@ class ReplayManager{
   static ReplayManager get instance => _getInstance();
   static ReplayManager _getInstance(){
     if(_instance==null){
-      _instance = ReplayManager.init();
+      _instance = ReplayManager._init();
     }
     return _instance;
   }
 
-  ReplayManager.init();
+  ReplayManager._init();
+
+
+  bool isDirty = true;
+  Map<int, List<Replay>> _rep_maps;
 
   static const SAVE_NAME = 'replays';
   save(Replay rep) async{
@@ -122,9 +126,13 @@ class ReplayManager{
     print("repjsonstr:"+jsonStr);
     repList.add(jsonStr);
     prefs.setStringList(SAVE_NAME, repList);
+    isDirty = true;
   }
 
-  loadAll() async{
+  Future<Map<int, List<Replay>>> loadAll() async{
+    if(!isDirty){
+      return _rep_maps;
+    }
     SharedPreferences prefs = await SharedPreferences.getInstance();
     var repStrList = prefs.getStringList(SAVE_NAME);
     var repMap = Map<int, List<Replay>>();
@@ -136,6 +144,8 @@ class ReplayManager{
       }
       repMap[rep.ID].add(rep);
     }
+    isDirty = false;
+    _rep_maps = repMap;
     return repMap;
   }
 }

@@ -20,7 +20,6 @@ class GameState extends State<Game>{
   static const int ACTIVE = 1;
   static const int WIN = 2;
 
-
   GameStateHandler curState;
   LevelPlayerInfo info;
 
@@ -96,7 +95,8 @@ class MenuState extends GameStateHandler{
             state.changeState(LevelChooseState(state, false));
           }, child: new Text('Game Start'),),
           new RaisedButton(onPressed: (){
-              state.changeState(LevelChooseState(state, true));
+
+            state.changeState(LevelChooseState(state, true));
             }, child: Text('Replay'),)
         ]
     ));
@@ -144,7 +144,8 @@ class LevelChooseState extends GameStateHandler{
     return RaisedButton(
       onPressed: (){
           if(isRep){
-            state.changeState(ReplayChooseState(state, level));
+            ReplayManager.instance.loadAll().then(
+                    (reps)=>state.changeState(ReplayChooseState(state, level, reps[level.id])));
           }else {
             state.changeState(new ActiveState(state, level));
           }
@@ -153,9 +154,9 @@ class LevelChooseState extends GameStateHandler{
     );
   }
 
+
   @override
   onEnter() {
-    return null;
   }
 
   @override
@@ -190,14 +191,7 @@ class ActiveState extends GameStateHandler{
   }
   @override
   onExit() {
-    var rep = ReplayBuilder()
-        .append(Command(0, DIR.DOWN))
-        .append(Command(0, DIR.DOWN))
-        .append(Command(0, DIR.DOWN))
-        .setName('ss')
-        .setID(level.id)
-        .build();
-    ReplayManager.instance.save(rep);
+
     return null;
   }
 }
@@ -213,12 +207,54 @@ class WinState extends GameStateHandler{
   
   @override
   Widget handle() {
+    String rep_name = "player_replay";
+    TextEditingController _controller = TextEditingController.fromValue(TextEditingValue(
+      text: rep_name
+    ));
+    TextField nameText = TextField(
+      onChanged: (input_str)=>rep_name=input_str,
+      controller: _controller,
+    );
     return new Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: <Widget>[
           Text("You Win"),
           Text("Time:"+state.info.playTime.toString()+"s"),
+          RaisedButton(
+            child: Text("Save replay"),
+            onPressed: ()=>showDialog(
+              context: state.context,
+              builder: (context)=>Dialog(
+
+                  child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Text("Enter replay name"),
+                    nameText,
+                    Row(
+                      children: <Widget>[
+                      SimpleDialogOption(
+                        onPressed: ()=>Navigator.pop(context),
+                        child: Text("Cancel"),
+                      ),
+                      SimpleDialogOption(
+                        onPressed: () {
+                          ReplayManager.instance.save(
+                              state.info.recorder.save(rep_name)
+                          );
+                          Navigator.pop(context);
+                        },
+                        child: Text("Save"),
+                      )
+                    ],
+                    mainAxisAlignment: MainAxisAlignment.start,)
+
+                  ],
+                ),)
+              )
+            ),
           RaisedButton(
             onPressed: ()=>state.changeState(MenuState(state)),
             child: Text("Home"),
@@ -231,24 +267,23 @@ class WinState extends GameStateHandler{
 
 /* 显示某关的所有rep供选择 */
 class ReplayChooseState extends GameStateHandler{
-  ReplayChooseState(GameState state, this._level) : super(state);
+  ReplayChooseState(GameState state, this._level, this._replays) : super(state);
 
   Level _level;
+  List<Replay> _replays;
   @override
   Widget handle() {
-
+    var btns = <Widget>[];
+    for(var rep in _replays){
+      btns.add(RaisedButton(
+        child: Text(rep.name),
+          onPressed: ()=>state.changeState(ReplayState(state, rep, _level),
+          )));
+    }
     return Center(
-      child: RaisedButton(onPressed: ()=>state.changeState(ReplayState(
-          state,
-          //Test rep object
-          ReplayBuilder()
-              .append(Command(0, DIR.DOWN))
-              .append(Command(0, DIR.DOWN))
-              .append(Command(0, DIR.DOWN))
-              .setName('ss')
-              .setID(_level.id)
-              .build(),
-          _level))),
+      child: Column(
+        children: btns,
+      )
     );
   }
 
@@ -289,6 +324,12 @@ class ReplayState extends GameStateHandler{
             RaisedButton(
               onPressed: ()=>_replay.forward(controller),
               child: Text(">"),
+            )
+            ,
+            Center()
+            ,RaisedButton(
+              onPressed: ()=>state.changeState(MenuState(state)),
+              child: Text("return to menu"),
             )
           ],
         )
