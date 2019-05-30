@@ -37,15 +37,18 @@ class GameState extends State<Game>{
   @override
   Widget build(BuildContext context) {
     Widget body = curState.handle();
-    return new Scaffold(
-      appBar: new AppBar(
-        title: new Text('klocki'),
-      ),
-      body: new AnimatedOpacity(
-        opacity: this.opacity,
-        duration: new Duration(milliseconds: duration),
-        child: body,
-      ),
+    return WillPopScope(
+        child:new Scaffold(
+          appBar: new AppBar(
+            title: new Text('klocki'),
+          ),
+          body: new AnimatedOpacity(
+            opacity: this.opacity,
+            duration: new Duration(milliseconds: duration),
+            child: body,
+          ),
+        ),
+        onWillPop: ()=>null,//禁用返回键
     );
   }
 
@@ -227,34 +230,38 @@ class WinState extends GameStateHandler{
               context: state.context,
               builder: (context)=>Dialog(
 
-                  child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  mainAxisSize: MainAxisSize.min,
-                  children: <Widget>[
-                    Text("Enter replay name"),
-                    nameText,
-                    Row(
+                  child: Padding(
+                    padding: EdgeInsets.all(32),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      mainAxisSize: MainAxisSize.min,
                       children: <Widget>[
-                      SimpleDialogOption(
-                        onPressed: ()=>Navigator.pop(context),
-                        child: Text("Cancel"),
-                      ),
-                      SimpleDialogOption(
-                        onPressed: () {
-                          ReplayManager.instance.save(
-                              state.info.recorder.save(rep_name)
-                          );
-                          Navigator.pop(context);
-                        },
-                        child: Text("Save"),
-                      )
-                    ],
-                    mainAxisAlignment: MainAxisAlignment.start,)
+                        Text("Enter replay name"),
+                        nameText,
+                        Row(
+                          children: <Widget>[
+                            SimpleDialogOption(
+                              onPressed: ()=>Navigator.pop(context),
+                              child: Text("Cancel"),
+                            ),
+                            SimpleDialogOption(
+                              onPressed: () {
+                                ReplayManager.instance.save(
+                                    state.info.recorder.save(rep_name)
+                                );
+                                Navigator.pop(context);
+                              },
+                              child: Text("Save"),
+                            )
+                          ],
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,)
 
-                  ],
-                ),)
+                      ],
+                    ),
+                  ),
               )
-            ),
+            )
+          ),
           RaisedButton(
             onPressed: ()=>state.changeState(MenuState(state)),
             child: Text("Home"),
@@ -281,7 +288,7 @@ class ReplayChooseState extends GameStateHandler{
           )));
     }
     return Center(
-      child: Column(
+      child: ListView(
         children: btns,
       )
     );
