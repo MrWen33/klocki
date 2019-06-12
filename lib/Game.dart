@@ -5,7 +5,6 @@ import 'dart:async';
 import 'Level.dart';
 import 'Replay.dart';
 import 'LevelPlayerInfo.dart';
-import 'Constants.dart';
 
 class Game extends StatefulWidget{
   @override
@@ -22,7 +21,7 @@ class GameState extends State<Game>{
 
   GameStateHandler curState;
   LevelPlayerInfo info;
-
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
 
   double opacity = 1.0;
   int duration = 300; //淡入淡出间隔(毫秒)
@@ -37,19 +36,26 @@ class GameState extends State<Game>{
   @override
   Widget build(BuildContext context) {
     Widget body = curState.handle();
-    return WillPopScope(
-        child:new Scaffold(
-          appBar: new AppBar(
-            title: new Text('klocki'),
-          ),
-          body: new AnimatedOpacity(
-            opacity: this.opacity,
-            duration: new Duration(milliseconds: duration),
-            child: body,
-          ),
-        ),
-        onWillPop: ()=>null,//禁用返回键
+    var scaffold = Scaffold(
+      key: _scaffoldKey,
+      appBar: new AppBar(
+        title: new Text('klocki'),
+      ),
+      body: new AnimatedOpacity(
+        opacity: this.opacity,
+        duration: new Duration(milliseconds: duration),
+        child: body,
+      ),
     );
+    return WillPopScope(
+        child: scaffold,
+        onWillPop: ()=>curState.onPop(),
+    );
+  }
+
+  void showMessage(String msg){
+
+    _scaffoldKey.currentState.showSnackBar(SnackBar(content: Text(msg)));
   }
 
   void changeState(GameStateHandler newState){
@@ -77,6 +83,8 @@ abstract class GameStateHandler{
   onEnter();
   Widget handle();
   onExit();
+
+  onPop();
 }
 
 class MenuState extends GameStateHandler{
@@ -108,6 +116,11 @@ class MenuState extends GameStateHandler{
   @override
   onExit() {
     return null;
+  }
+
+  @override
+  onPop() {
+    //do nothing
   }
 }
 
@@ -148,7 +161,14 @@ class LevelChooseState extends GameStateHandler{
       onPressed: (){
           if(isRep){
             ReplayManager.instance.loadAll().then(
-                    (reps)=>state.changeState(ReplayChooseState(state, level, reps[level.id])));
+                    (reps){
+                      if(reps.containsKey(level.id)) {
+                        state.changeState(
+                            ReplayChooseState(state, level, reps[level.id]));
+                      }else{
+                        state.showMessage("No Replay");
+                      }
+                    });
           }else {
             state.changeState(new ActiveState(state, level));
           }
@@ -165,6 +185,11 @@ class LevelChooseState extends GameStateHandler{
   @override
   onExit() {
     return null;
+  }
+
+  @override
+  onPop() {
+    state.changeState(MenuState(state));
   }
 
 }
@@ -197,6 +222,11 @@ class ActiveState extends GameStateHandler{
 
     return null;
   }
+
+  @override
+  onPop() {
+    state.changeState(LevelChooseState(state, false));
+  }
 }
 
 class WinState extends GameStateHandler{
@@ -207,7 +237,12 @@ class WinState extends GameStateHandler{
   
   @override
   onExit() {}
-  
+
+  @override
+  onPop() {
+    state.changeState(MenuState(state));
+  }
+
   @override
   Widget handle() {
     String rep_name = "player_replay";
@@ -304,6 +339,11 @@ class ReplayChooseState extends GameStateHandler{
     return null;
   }
 
+  @override
+  onPop() {
+    state.changeState(LevelChooseState(state, true));
+  }
+
 }
 
 //TODO: ReplayState implement
@@ -319,17 +359,18 @@ class ReplayState extends GameStateHandler{
     var checkerboard = Checkerboard(initState: this._level.info, levelID: _replay.ID,
         controller: controller,
         onWin: (info){});
+    var repPlayer = ReplayPlayer(_replay);
     return new Center(
       child: Column(children: <Widget>[
         checkerboard,
         Row(
           children: <Widget>[
             RaisedButton(
-              onPressed: ()=>_replay.back(controller),
+              onPressed: ()=>repPlayer.back(controller),
               child: Text("<"),
             ),
             RaisedButton(
-              onPressed: ()=>_replay.forward(controller),
+              onPressed: ()=>repPlayer.forward(controller),
               child: Text(">"),
             )
             ,
@@ -354,4 +395,8 @@ class ReplayState extends GameStateHandler{
     return null;
   }
 
+  @override
+  onPop() {
+    state.changeState(LevelChooseState(state, true));
+  }
 }

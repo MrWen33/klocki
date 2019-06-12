@@ -18,12 +18,46 @@ abstract class CommandReceiver{
   bool undo(Command cmd);
 }
 
+class ReplayPlayer{
+
+  ReplayPlayer(this._rep);
+
+  Replay _rep;
+  int _curInd = 0;
+
+  /*
+  向前执行指令, 若到底则返回false
+   */
+  bool forward(CommandReceiver receiver){
+    var _commands = _rep._commands;
+    if(_curInd>=_commands.length){
+      return false;
+    }
+    receiver.execute(_commands[_curInd]);
+    _curInd++;
+    return true;
+  }
+
+  /*
+  回退指令, 若到头则返回false
+   */
+  bool back(CommandReceiver receiver){
+    var _commands = _rep._commands;
+    var backInd = _curInd-1;
+    if(backInd<0){
+      return false;
+    }
+    receiver.undo(_commands[backInd]);
+    _curInd = backInd;
+    return true;
+  }
+}
+
 class Replay{
   final int ID;
   final String name;
   List<Command> _commands;
 
-  int _curInd = 0;
   Replay(this.ID, this.name, List<Command> commands){
     _commands = commands;
   }
@@ -41,30 +75,6 @@ class Replay{
     }
   }
 
-  /*
-  向前执行指令, 若到底则返回false
-   */
-  bool forward(CommandReceiver receiver){
-    if(_curInd>=_commands.length){
-      return false;
-    }
-    receiver.execute(_commands[_curInd]);
-    _curInd++;
-    return true;
-  }
-
-  /*
-  回退指令, 若到头则返回false
-   */
-  bool back(CommandReceiver receiver){
-    var backInd = _curInd-1;
-    if(backInd<0){
-      return false;
-    }
-    receiver.undo(_commands[backInd]);
-    _curInd = backInd;
-    return true;
-  }
 }
 
 class ReplayBuilder{
